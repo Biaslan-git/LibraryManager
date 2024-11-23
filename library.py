@@ -2,10 +2,29 @@ import json
 import os
 from enum import Enum
 
+import texts
+
 
 class BookStatus(Enum):
     InStock = 'в наличии'
     Given = 'выдана'
+
+    @classmethod
+    def get_by_value(cls, value: str):
+        '''Получение свойства по значению'''
+        for item in cls:
+            if item.value == value:
+                return item
+
+    @classmethod
+    def get_numerate_statuses(cls) -> dict:
+        '''Выводит доступные статусы'''
+        i = 1
+        result = {}
+        for item in cls:
+            result[i] = item
+            i+=1
+        return result
 
 class Book:
     '''Класс, представляющий книгу в библиотеке'''
@@ -69,7 +88,13 @@ class Library:
         :param data: Словарь с данными книги.
         :return: Объект книги.
         '''
-        book = Book(data['title'], data['author'], data['year'], data['status'])
+        book = Book(
+            data['title'], 
+            data['author'], 
+            data['year'], 
+            BookStatus.get_by_value(data['status']) or BookStatus.InStock
+        )
+
         book.id = data['id']
         return book
 
@@ -130,12 +155,33 @@ class Library:
             or query in str(book.year)]
         return results
 
-    def display_books(self):
+    def display_books(self) -> list[int] | None:
+        '''
+        Выводит информацию о всех книгах в библиотеке.
+
+        :return: Список из ID книг в библиотеке.
+        '''
+        if not self.books:
+            print('Вы еще не добавили книги.')
+            return
+        book_ids = []
         for book in self.books:
-            print(f'ID: {book.id}, Название: {book.title}, \
-            Автор: {book.author}, Год: {book.year}, Статус: {book.status.value}')
+            book_ids.append(book.id)
+            print(texts.book_info_in_line.format(
+                book.id, book.title, book.author, book.year, book.status.value
+            ))
+        print()
+        return book_ids
 
     def change_status(self, book_id: int, new_status: BookStatus):
+        '''
+        Меняет статус книги.
+
+        :param book_id: Идентификатор книги.
+        :param new_status: Новый статус.
+        :raises ValueError: Если книга с данным ID не найдена.
+        :return: Книга с обновленным статусом.
+        '''
         for book in self.books:
             if book.id == book_id:
                 if book.status != new_status:
@@ -144,10 +190,130 @@ class Library:
                 return book
         raise ValueError('Книга с данными ID не найдена.')
 
+
 def main():
-    pass
+    '''Главная функция.'''
+    library = Library('library.json')
+
+    while True:
+        print('Выберите действие:')
+        print(texts.actions)
+        choose = input('=> ')
+        if choose.isdigit() and int(choose) in range(1, 6):
+            try:
+                if int(choose)!=4: print(texts.press_ctrl_c)
+                match int(choose):
+                    case 1:
+                        add_book(library)
+                    case 2:
+                        remove_book(library)
+                    case 3:
+                        search_books(library)
+                    case 4:
+                        print()
+                        library.display_books()
+                    case 5:
+                        change_status(library)
+            except (KeyboardInterrupt, EOFError):
+                print('\n\nОтмена.\n')
+        else:
+            print(texts.incorrect)
+
+def add_book(library: Library):
+    '''Интерактивное добавление книги'''
+    title = input(texts.add_book[0])
+    author = input(texts.add_book[1])
+    while True:
+        try:
+            year = int(input(texts.add_book[2]))
+            break
+        except ValueError:
+            print(texts.incorrect)
+
+    book = library.add_book(title, author, year)
+    print(texts.book_is_added.format(**book.to_dict()))
+        
+
+def remove_book(library: Library):
+    '''Интерактивное удаление книги.'''
+    book_ids = library.display_books()
+    if not book_ids:
+        print(texts.no_books)
+        return
+    while True:
+        try:
+            book_id = int(input(texts.enter_delete_id))
+            try:
+                library.remove_book(book_id)
+                print(texts.book_success_removed)
+                library.display_books()
+                break
+            except ValueError:
+                print(texts.book_id_does_not_exists)
+        except ValueError:
+            print(texts.incorrect)
+    
+
+def search_books(library: Library):
+    '''Интерактивный поиск книги.'''
+    if not library.books:
+        print(texts.no_books)
+        return
+    while True:
+        query = input(texts.enter_search_query)
+        books = library.search_books(query.strip())
+        if books:
+            for book in books:
+                print(texts.book_info_in_line.format(
+                    book.id, book.title, book.author, book.year, book.status.value
+                ))
+        else:
+            print(texts.book_is_not_found)
+            
+
+def change_status(library: Library):
+    '''Интерактивное изменение статуса книги.'''
+    status_has_been_changed = False
+    while not status_has_been_changed:
+        book_ids = library.display_books()
+        if not book_ids:
+            print(texts.no_books)
+            return
+        try:
+            book_id = int(input(texts.enter_change_id))
+            if not book_id in book_ids:
+                raise ValueError
+            try:
+                while True:
+                    print(texts.available_statuses)
+                    statuses_dict = BookStatus.get_numerate_statuses()
+                    for num, status in statuses_dict.items():
+                        print(f'{num}. {status.value}')
+                    print()
+
+                    try:
+                        status_num = int(input(texts.enter_status_num))
+                        book = library.change_status(book_id, statuses_dict[status_num])
+                        print(texts.status_success_changed)
+                        print(texts.book_info_in_line.format(
+                            book.id, book.title, book.author, book.year, book.status.value
+                        ))
+                        print()
+                        status_has_been_changed = True
+                        break
+                    except (KeyError, ValueError):
+                        print(texts.incorrect)
+            except ValueError:
+                print(texts.book_id_does_not_exists)
+        except ValueError:
+            print(texts.incorrect)
+        
 
 
 if __name__=='__main__':
-    main()
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        print('\nВыход.')
+        exit()
 
