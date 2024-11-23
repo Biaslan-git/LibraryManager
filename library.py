@@ -25,7 +25,7 @@ class Book:
         :param year: Год издания книги.
         :param status: Статус книги (по умолчанию "в наличии").
         '''
-        self.id = None # идентификатор будет устоновлен позже
+        self.id: int | None = None # идентификатор будет устоновлен позже
         self.title = title
         self.author = author
         self.year = year
