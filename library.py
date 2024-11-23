@@ -88,9 +88,9 @@ class Library:
         self.save_books()
         return book
 
-    def generate_id(self) -> None:
+    def generate_id(self) -> int:
         '''Генерирует уникальный идентификатор для новой книги.'''
-        max_id = max([book.id for book in self.books], default=-1)
+        max_id = max([book.id for book in self.books if book.id is not None], default=-1)
         return max_id + 1
 
     def save_books(self) -> None:
